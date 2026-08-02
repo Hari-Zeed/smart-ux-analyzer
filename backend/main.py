@@ -8,6 +8,7 @@ Run with:
 
 import json
 import logging
+import os
 import sqlite3
 import time
 import uuid
@@ -15,6 +16,10 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from jose import JWTError, jwt as jose_jwt
 import bcrypt as _bcrypt
@@ -143,7 +148,9 @@ init_db()
 # Auth: JWT + Password Hashing
 # ──────────────────────────────────────────────────────────────────────────────
 
-SECRET_KEY = "smart-ux-analyzer-jwt-secret-change-in-production-2024"
+SECRET_KEY = os.getenv("SECRET_KEY", "smart-ux-analyzer-jwt-secret-change-in-production-2024")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
@@ -806,6 +813,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
+@app.get("/healthz")
 def health_check():
     return {"status": "ok", "version": "2.0.0"}
 
@@ -1157,6 +1165,13 @@ def reset_password(payload: ResetPasswordRequest):
                      (hash_password(payload.new_password), int(data["sub"])))
         conn.commit()
     return {"message": "Password reset successfully. You may now log in."}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
 
 
 
