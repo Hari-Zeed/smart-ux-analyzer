@@ -28,19 +28,15 @@
       "destination": "backend/main.py"
     },
     {
-      "source": "/profile/:id",
+      "source": "/profile/:path*",
       "destination": "backend/main.py"
     },
     {
-      "source": "/stats/:id",
+      "source": "/stats/:path*",
       "destination": "backend/main.py"
     },
     {
-      "source": "/settings/update",
-      "destination": "backend/main.py"
-    },
-    {
-      "source": "/settings/:id",
+      "source": "/settings/:path*",
       "destination": "backend/main.py"
     },
     {
