@@ -1,0 +1,39 @@
+# v0 sandbox internal files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+.vercel/
+
+# Environment variables (NEVER commit secrets)
+.env*.local
+.env
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+
+# Python / Backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+backend/__pycache__/
+backend/*.db
+backend/ux_analyzer.db
+
+# System files
+.DS_Store
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
