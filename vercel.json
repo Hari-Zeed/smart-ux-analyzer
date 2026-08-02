@@ -10,10 +10,42 @@
       "use": "@vercel/python"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(analyze|reports|stats|settings|profile|auth).*",
-      "dest": "backend/main.py"
+      "source": "/health",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/analyze",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/reports",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/reports/:path*",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/profile/:id",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/stats/:id",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/settings/update",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/settings/:id",
+      "destination": "backend/main.py"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "backend/main.py"
     }
   ]
 }
