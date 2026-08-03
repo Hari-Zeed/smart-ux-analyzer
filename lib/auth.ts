@@ -1,4 +1,4 @@
-import { BACKEND_URL } from './api'
+import { getBackendUrl } from './api'
 
 export interface AuthUser {
   id: number
@@ -41,13 +41,33 @@ export function cacheUser(user: AuthUser): void {
 // ─── Auth API calls ───────────────────────────────────────────────────────────
 
 async function authFetch(path: string, body: unknown) {
-  const res = await fetch(`${BACKEND_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error ?? data.detail ?? 'Request failed')
+  const targetUrl = `${getBackendUrl()}${path}`
+  console.log(`[Auth API Request] POST ${targetUrl}`, body)
+
+  let res: Response
+  try {
+    res = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    console.error(`[Auth API Error] Failed to connect to ${targetUrl}:`, err)
+    throw new Error(`Could not connect to backend server at ${getBackendUrl()}.`)
+  }
+
+  let data: any
+  try {
+    data = await res.json()
+  } catch {
+    throw new Error(`Server returned non-JSON response (HTTP ${res.status}).`)
+  }
+
+  if (!res.ok) {
+    console.error(`[Auth API Error] HTTP ${res.status}:`, data)
+    throw new Error(data.error ?? data.detail ?? `Request failed with HTTP ${res.status}`)
+  }
+
   return data
 }
 
@@ -77,15 +97,17 @@ export async function apiSocialLogin(name: string, email: string, googleId?: str
 export async function apiGetMe(): Promise<AuthUser | null> {
   const token = getToken()
   if (!token) return null
+  const targetUrl = `${getBackendUrl()}/auth/me`
   try {
-    const res = await fetch(`${BACKEND_URL}/auth/me`, {
+    const res = await fetch(targetUrl, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) return null
     const user = await res.json()
     cacheUser(user)
     return user
-  } catch {
+  } catch (err) {
+    console.error('[Auth API Error] apiGetMe failed:', err)
     return null
   }
 }

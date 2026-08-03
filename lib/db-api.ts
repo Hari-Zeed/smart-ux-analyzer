@@ -1,4 +1,4 @@
-import { BACKEND_URL, ApiError, AnalysisResult } from './api'
+import { getBackendUrl, ApiError, AnalysisResult } from './api'
 
 export interface UserProfileResponse {
   id: string
@@ -21,11 +21,13 @@ export interface UserStats {
 // ─────────────────────────────────────────────
 
 export async function fetchReports(userId?: string): Promise<AnalysisResult[]> {
-  const url = new URL(`${BACKEND_URL}/reports`)
+  const baseUrl = getBackendUrl()
+  const url = new URL(`${baseUrl}/reports`)
   if (userId) {
     url.searchParams.append('user_id', userId)
   }
 
+  console.log(`[DB API Debug] Fetching reports from: ${url.toString()}`)
   try {
     const res = await fetch(url.toString())
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -37,8 +39,10 @@ export async function fetchReports(userId?: string): Promise<AnalysisResult[]> {
 }
 
 export async function fetchReportById(id: number | string): Promise<AnalysisResult | null> {
+  const url = `${getBackendUrl()}/reports/${id}`
+  console.log(`[DB API Debug] Fetching report #${id} from ${url}`)
   try {
-    const res = await fetch(`${BACKEND_URL}/reports/${id}`)
+    const res = await fetch(url)
     if (!res.ok) return null
     return await res.json()
   } catch (err) {
@@ -48,8 +52,10 @@ export async function fetchReportById(id: number | string): Promise<AnalysisResu
 }
 
 export async function deleteReport(id: number): Promise<boolean> {
+  const url = `${getBackendUrl()}/reports/${id}`
+  console.log(`[DB API Debug] Deleting report #${id} at ${url}`)
   try {
-    const res = await fetch(`${BACKEND_URL}/reports/${id}`, {
+    const res = await fetch(url, {
       method: 'DELETE',
     })
     return res.ok
@@ -60,14 +66,16 @@ export async function deleteReport(id: number): Promise<boolean> {
 }
 
 export function getReportPdfUrl(id: number): string {
-  return `${BACKEND_URL}/reports/${id}/pdf`
+  return `${getBackendUrl()}/reports/${id}/pdf`
 }
 
 export async function downloadReportPdf(id: number, filename?: string): Promise<void> {
+  const pdfUrl = getReportPdfUrl(id)
+  console.log(`[DB API Debug] Downloading PDF from ${pdfUrl}`)
   try {
-    const res = await fetch(getReportPdfUrl(id))
-    if (!res.ok) throw new Error('PDF download failed')
-    
+    const res = await fetch(pdfUrl)
+    if (!res.ok) throw new Error(`PDF download failed (HTTP ${res.status})`)
+
     const blob = await res.blob()
     const downloadUrl = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -87,9 +95,14 @@ export async function downloadReportPdf(id: number, filename?: string): Promise<
 // Profile & Stats API
 // ─────────────────────────────────────────────
 
-export async function syncUserProfileToBackend(userId: string, data: { name: string; email: string; phone: string }): Promise<UserProfileResponse | null> {
+export async function syncUserProfileToBackend(
+  userId: string,
+  data: { name: string; email: string; phone: string }
+): Promise<UserProfileResponse | null> {
+  const url = `${getBackendUrl()}/profile/${userId}`
+  console.log(`[DB API Debug] Syncing profile to ${url}`, data)
   try {
-    const res = await fetch(`${BACKEND_URL}/profile/${userId}`, {
+    const res = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -103,8 +116,10 @@ export async function syncUserProfileToBackend(userId: string, data: { name: str
 }
 
 export async function fetchUserStats(userId: string): Promise<UserStats> {
+  const url = `${getBackendUrl()}/stats/${userId}`
+  console.log(`[DB API Debug] Fetching stats from ${url}`)
   try {
-    const res = await fetch(`${BACKEND_URL}/stats/${userId}`)
+    const res = await fetch(url)
     if (!res.ok) throw new Error()
     return await res.json()
   } catch {
@@ -130,8 +145,10 @@ export interface UserSettingsResponse {
 }
 
 export async function fetchBackendSettings(userId: string): Promise<UserSettingsResponse> {
+  const url = `${getBackendUrl()}/settings/${userId}`
+  console.log(`[DB API Debug] Fetching settings from ${url}`)
   try {
-    const res = await fetch(`${BACKEND_URL}/settings/${userId}`)
+    const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
@@ -144,6 +161,7 @@ export async function updateBackendSettings(
   userId: string,
   settings: { dark_mode?: boolean; auto_analysis?: boolean; data_sharing?: boolean }
 ): Promise<UserSettingsResponse> {
+  const url = `${getBackendUrl()}/settings/update`
   try {
     const current = await fetchBackendSettings(userId)
     const payload = {
@@ -153,7 +171,8 @@ export async function updateBackendSettings(
       data_sharing: settings.data_sharing ?? current.data_sharing,
     }
 
-    const res = await fetch(`${BACKEND_URL}/settings/update`, {
+    console.log(`[DB API Debug] Updating settings at ${url}`, payload)
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -170,5 +189,3 @@ export async function updateBackendSettings(
     }
   }
 }
-
-

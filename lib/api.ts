@@ -10,6 +10,15 @@ export interface Suggestion {
   priority: 'High' | 'Medium' | 'Low'
 }
 
+export interface CoreWebVitals {
+  lcp?: string | null
+  fcp?: string | null
+  cls?: string | null
+  tbt?: string | null
+  ttfb?: string | null
+  speed_index?: string | null
+}
+
 export interface AnalysisResult {
   id: number
   user_id?: string
@@ -18,7 +27,9 @@ export interface AnalysisResult {
   accessibility: number   // 0-100
   performance: number     // 0-100
   seo: number             // 0-100
+  core_web_vitals?: CoreWebVitals
   suggestions: Suggestion[]
+  data_source?: string
   created_at: string
 }
 
@@ -38,10 +49,28 @@ export class ApiError extends Error {
 }
 
 // ─────────────────────────────────────────────
-// analyzeUrl — POST /analyze
+// Get dynamic backend URL strictly from NEXT_PUBLIC_API_URL
 // ─────────────────────────────────────────────
 
-export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000'
+export function getBackendUrl(): string {
+  const url = process.env.NEXT_PUBLIC_API_URL
+  if (!url) {
+    throw new Error("NEXT_PUBLIC_API_URL is not set")
+  }
+  return url.replace(/\/+$/, '')
+}
+
+export const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '')
+  : ''
+
+if (typeof window !== 'undefined') {
+  console.log("Backend URL:", BACKEND_URL || "NOT SET (NEXT_PUBLIC_API_URL is missing)")
+}
+
+// ─────────────────────────────────────────────
+// analyzeUrl — POST /analyze
+// ─────────────────────────────────────────────
 
 export async function analyzeUrl(url: string, userId?: string): Promise<AnalysisResult> {
   const trimmed = url.trim()
@@ -53,36 +82,66 @@ export async function analyzeUrl(url: string, userId?: string): Promise<Analysis
   }
 
   const effectiveUserId = userId || getOrCreateUserId()
+  const backendBase = getBackendUrl()
+  const targetEndpoint = `${backendBase}/analyze`
+
+  console.log(`[UX Analyzer API] Initiating POST request to: ${targetEndpoint}`, {
+    url: trimmed,
+    user_id: effectiveUserId,
+  })
+
+  // 45-second timeout controller (Render cold-starts + PageSpeed API)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 45_000)
 
   let response: Response
   try {
-    response = await fetch(`${BACKEND_URL}/analyze`, {
+    response = await fetch(targetEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
       body: JSON.stringify({ url: trimmed, user_id: effectiveUserId }),
-      signal: AbortSignal.timeout(30_000), // 30 s hard timeout
+      signal: controller.signal,
     })
   } catch (err: unknown) {
-    if (err instanceof DOMException && err.name === 'TimeoutError') {
-      throw new ApiError('Request timed out. The site may be slow or unreachable.')
+    clearTimeout(timeoutId)
+    console.error('[UX Analyzer API Error] Fetch request failed:', err)
+
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(
+        'Request timed out (45s). The target website or Render backend server is taking too long to respond.',
+      )
+    }
+    if (err instanceof Error && err.message === 'NEXT_PUBLIC_API_URL is not set') {
+      throw new ApiError('NEXT_PUBLIC_API_URL is not configured in environment variables.')
     }
     throw new ApiError(
-      'Cannot reach the analyzer backend. Make sure it is running on port 8000.',
+      `Cannot connect to analyzer backend (${backendBase}). Please verify the backend service is running and CORS is enabled.`,
     )
+  } finally {
+    clearTimeout(timeoutId)
   }
+
+  console.log(`[UX Analyzer API Debug] Response Status: ${response.status} ${response.statusText}`)
 
   let body: unknown
   try {
     body = await response.json()
-  } catch {
-    throw new ApiError(`Server returned an unexpected response (HTTP ${response.status}).`)
+  } catch (parseErr) {
+    console.error('[UX Analyzer API Error] Failed to parse JSON response:', parseErr)
+    throw new ApiError(`Server returned an invalid non-JSON response (HTTP ${response.status}).`)
   }
 
   if (!response.ok) {
     const detail =
       typeof body === 'object' && body !== null && 'error' in body
         ? String((body as Record<string, unknown>).error)
+        : typeof body === 'object' && body !== null && 'detail' in body
+        ? String((body as Record<string, unknown>).detail)
         : `HTTP ${response.status}`
+    console.error(`[UX Analyzer API Error] Backend returned HTTP ${response.status}:`, detail)
     throw new ApiError(detail, response.status)
   }
 
